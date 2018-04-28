@@ -1,0 +1,3 @@
+id,name,lastname,id_code,email,id_type,created_at,updated_at
+1,"Juan Carlos","Gama Roa",123,jcgamar@unal.edu.co,cc,"2018-04-22 22:00:12","2018-04-22 22:00:12"
+2,"Diego ",Cruz,124,diacruzmo@unal.edu.co,cc,"2018-04-22 22:00:13","2018-04-22 22:00:13"

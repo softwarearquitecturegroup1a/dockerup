@@ -1,0 +1,138 @@
+version: '2'
+services:
+  
+  # Profile pictures
+  db:
+    image: mongo:3.3
+    container_name: profilepicture-db
+    ports:
+      - "3008:27017"
+    volumes:
+      - ./backup:/backup:rw
+
+  profilepictures:
+    # build: ./profilepictures
+    image: fullhd4knofake/1a_profilepictures
+    container_name: profilepictures-ms
+    depends_on:
+      - db
+    links:
+      - db
+    environment:
+      VIRTUAL_HOST: profilepictures.local
+    ports:
+      - "3003:8080"
+    depends_on:
+      - db
+
+  # Bicicletas
+  bicicletasdb:
+    image: mysql
+    ports:
+      - "3309:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_USER: diego
+      MYSQL_PASSWORD: 1234
+      MYSQL_DATABASE: bicicletasdb
+      MYSQL_HOST: bicicletasdb
+  biciun:
+    image: fullhd4knofake/bicicletas
+    # build: .
+    ports:
+      - "3004:9002"
+    depends_on:
+      - bicicletasdb
+
+  # Usuarios
+  users-db:
+    image: mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123
+      MYSQL_USER: arquisoft
+      MYSQL_PASSWORD: 123
+      MYSQL_DATABASE: users
+      MYSQL_HOST: users-db
+  users-ms:
+    image: fullhd4knofake/usuarios
+    command: bash -c "sleep 40 && rm -f tmp/pids/server.pid && bundle exec rails db:migrate && bundle exec rails s -p 3001 -b '0.0.0.0'"
+    ports:
+      - "3001:3001"
+    depends_on:
+      - users-db
+
+  # Historial de prestamos
+  historial-db:
+    image: mysql
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: asdf
+      MYSQL_USER: juancho
+      MYSQL_PASSWORD: asdf
+      MYSQL_DATABASE: historial
+      MYSQL_HOST: historial-db
+  historial-ms:
+    image: fullhd4knofake/historial
+    ports:
+      - "3002:9001"
+    depends_on:
+      - historial-db
+  
+  # Usuarios con session abierta
+  1a_login_ms:
+    image: fullhd4knofake/1a_login_ms
+    ports:
+     - "3005:5000"
+    depends_on:
+     - 1a_login_db
+  1a_login_db:
+    image: mysql
+    ports:
+      - "3310:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_USER: alejo
+      MYSQL_PASSWORD: 1234
+      MYSQL_DATABASE: users
+      MYSQL_HOST: 1a_login_db
+
+  # Api Gateway
+  biciun-api:
+    image: fullhd4knofake/api-gateway
+    environment:
+      PORT: '4500'
+      SHOW_URLS: 'true'
+
+      USERS_URL: 'users-ms'
+      USERS_PORT: '3001'
+      USERS_ENTRY: 'users/'
+      
+      PRESTAMOS_URL: 'historial-ms'
+      PRESTAMOS_PORT: '9001'
+      PRESTAMOS_ENTRY: 'prestamos'
+      
+      PROFILES_PHOTOS_URL: 'profilepictures'
+      PROFILES_PHOTOS_PORT: '8080'
+      PROFILES_PHOTOS_ENTRY: 'profilepictures'
+      
+      LOGIN_URL: '1a_login_ms'
+      LOGIN_PORT: '5000'
+      LOGIN_ENTRY: 'login'
+
+      BICICLETAS_URL: 'biciun'
+      BICICLETAS_PORT: '9002'
+      BICICLETAS_ENTRY: 'bicicletas'
+    ports:
+      - '80:4500'
+    depends_on:
+      - historial-db
+      - historial-ms
+      - users-db
+      - users-ms
+      - bicicletasdb
+      - biciun
+      - profilepictures
+      - db
