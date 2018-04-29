@@ -11,7 +11,6 @@ services:
       - ./backup:/backup:rw
 
   profilepictures:
-    # build: ./profilepictures
     image: fullhd4knofake/1a_profilepictures
     container_name: profilepictures-ms
     depends_on:
@@ -27,7 +26,7 @@ services:
 
   # Bicicletas
   bicicletasdb:
-    image: mysql
+    image: mysql:5.7
     ports:
       - "3309:3306"
     environment:
@@ -38,7 +37,6 @@ services:
       MYSQL_HOST: bicicletasdb
   biciun:
     image: fullhd4knofake/bicicletas
-    # build: .
     ports:
       - "3004:9002"
     depends_on:
@@ -46,7 +44,7 @@ services:
 
   # Usuarios
   users-db:
-    image: mysql
+    image: mysql:5.7
     ports:
       - "3306:3306"
     environment:
@@ -65,7 +63,7 @@ services:
 
   # Historial de prestamos
   historial-db:
-    image: mysql
+    image: mysql:5.7
     ports:
       - "3307:3306"
     environment:
@@ -81,7 +79,7 @@ services:
     depends_on:
       - historial-db
   
-  # Usuarios con session abierta
+  # Tokens
   1a_login_ms:
     image: fullhd4knofake/1a_login_ms
     ports:
@@ -89,7 +87,7 @@ services:
     depends_on:
      - 1a_login_db
   1a_login_db:
-    image: mysql
+    image: mysql:5.7
     ports:
       - "3310:3306"
     environment:
@@ -98,6 +96,57 @@ services:
       MYSQL_PASSWORD: 1234
       MYSQL_DATABASE: users
       MYSQL_HOST: 1a_login_db
+
+  biciun-ldap:
+    image: osixia/openldap:1.1.8
+    container_name: biciun-ldap
+    environment:
+      COMPOSE_HTTP_TIMEOUT: 200
+      LDAP_LOG_LEVEL: "256"
+      LDAP_ORGANISATION: "Software Architecture"
+      LDAP_DOMAIN: "arqsoft.unal.edu.co"
+      LDAP_BASE_DN: ""
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_CONFIG_PASSWORD: "config"
+      LDAP_READONLY_USER: "false"
+      #LDAP_READONLY_USER_USERNAME: "readonly"
+      #LDAP_READONLY_USER_PASSWORD: "readonly"
+      LDAP_BACKEND: "hdb"
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: "ldap.crt"
+      LDAP_TLS_KEY_FILENAME: "ldap.key"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.crt"
+      LDAP_TLS_ENFORCE: "false"
+      LDAP_TLS_CIPHER_SUITE: "SECURE256:-VERS-SSL3.0"
+      LDAP_TLS_PROTOCOL_MIN: "3.1"
+      LDAP_TLS_VERIFY_CLIENT: "demand"
+      LDAP_REPLICATION: "false"
+      #LDAP_REPLICATION_CONFIG_SYNCPROV: "binddn="cn=admin,cn=config" bindmethod=simple credentials=$LDAP_CONFIG_PASSWORD searchbase="cn=config" type=refreshAndPersist retry="60 +" timeout=1 starttls=critical"
+      #LDAP_REPLICATION_DB_SYNCPROV: "binddn="cn=admin,$LDAP_BASE_DN" bindmethod=simple credentials=$LDAP_ADMIN_PASSWORD searchbase="$LDAP_BASE_DN" type=refreshAndPersist interval=00:00:00:10 retry="60 +" timeout=1 starttls=critical"
+      #LDAP_REPLICATION_HOSTS: "#PYTHON2BASH:['ldap://ldap.example.org','ldap://ldap2.example.org']"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_SSL_HELPER_PREFIX: "ldap"
+    tty: true
+    stdin_open: true
+    volumes:
+      - /var/lib/ldap
+      - /etc/ldap/slapd.d
+      - /container/service/slapd/assets/certs/
+    ports:
+      - "389:389"
+      - "636:636"
+    hostname: "arqsoft.org"
+    
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    container_name: phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: "biciun-ldap"
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "8085:80"
+    links:
+      - biciun-ldap
 
   # Api Gateway
   biciun-api:
@@ -125,8 +174,13 @@ services:
       BICICLETAS_URL: 'biciun'
       BICICLETAS_PORT: '9002'
       BICICLETAS_ENTRY: 'bicicletas'
+
+      AUTH_URL: 
+      AUTH_PORT: '3001'
+      AUTH_ENTRY: 'ldap/'
+
     ports:
-      - '80:4500'
+      - '4500:4500'
     depends_on:
       - historial-db
       - historial-ms
@@ -136,3 +190,10 @@ services:
       - biciun
       - profilepictures
       - db
+
+  biciun-proxy:
+    image: fullhd4knofake/proxy
+    ports:
+      - "80:80"
+    depends_on: 
+      - biciun-api
