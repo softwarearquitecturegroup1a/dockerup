@@ -84,6 +84,7 @@ services:
     image: fullhd4knofake/1a_login_ms
     ports:
      - "3005:5000"
+    restart: unless-stopped
     depends_on:
      - 1a_login_db
   1a_login_db:
