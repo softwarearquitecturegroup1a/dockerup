@@ -1,9 +1,8 @@
 rancher-compose \
---project-name biciun \
---url http://35.184.0.116:8080/v1/projects/1a5 \
---access-key 63354DB008A4760DADEC \
---secret-key 3L6zxwVJ8boqBe4TdXCqmZ8xMT4kxshWNN5WjYgN \
--f docker-compose.yml \
+--project-name biciun-all \
+--url http://35.184.0.116:8080/v1/projects/1a705 \
+--access-key BF98359EB9F1AE7D2EF6 \
+--secret-key 3AZHiE2uC7GDGTuKAUQJSxyQhwNNMW6fMCUURksG \
+-f biciun-compose.yml \
 --verbose up \
--d --force-upgrade \
---confirm-upgrade
+-d --confirm-upgrade

@@ -1,0 +1,218 @@
+version: '2'
+services:
+  # WEB
+  web-lb:
+    image: rancher/lb-service-haproxy:v0.9.1
+    links:
+    - biciun-web:http
+    ports:
+    - 4000:4000/tcp
+  biciun-web:
+    image: fullhd4knofake/web
+    stdin_open: true
+    tty: true
+    links:
+    - biciun-proxy:http
+    ports:
+    - 3000:4000/tcp
+    labels:
+      io.rancher.container.pull_image: always
+
+  # HISTORIAL
+  historial-lb:
+    image: rancher/lb-service-haproxy:v0.9.1
+    ports:
+    - 4002:4002/tcp
+  historial-ms:
+    image: fullhd4knofake/historial
+    links:
+    - historial-db:jdbc
+    ports:
+    - 3002:9001/tcp
+  historial-db:
+    image: mysql:5.7
+    environment:
+      MYSQL_DATABASE: historial
+      MYSQL_HOST: historial-db
+      MYSQL_PASSWORD: asdf
+      MYSQL_ROOT_PASSWORD: asdf
+      MYSQL_USER: juancho
+    ports:
+    - 3307:3306/tcp
+
+  # USERS
+  users-lb:
+    image: rancher/lb-service-haproxy:v0.9.1
+    ports:
+    - 4001:4001/tcp
+  users-ms:
+    image: mikeangelo007/users-ms
+    links:
+    - users-db:mysql2
+    - biciun-ldap:net-ldap
+    ports:
+    - 3001:3001/tcp
+    command:
+    - bash
+    - -c
+    - sleep 40 && rm -f tmp/pids/server.pid && bundle exec rails db:migrate && bundle exec rails s -p 3001 -b '0.0.0.0'
+  users-db:
+    image: mysql:5.7.22
+    environment:
+      MYSQL_DATABASE: users
+      MYSQL_HOST: users-db
+      MYSQL_PASSWORD: '123'
+      MYSQL_ROOT_PASSWORD: '123'
+      MYSQL_USER: arquisoft
+    ports:
+    - 3306:3306/tcp
+
+  # BICICLETAS
+  bicicletas-lb:
+    image: rancher/lb-service-haproxy:v0.9.1
+    ports:
+    - 4002:4002/tcp
+  bicicletasdb:
+    image: mysql:5.7.22
+    environment:
+      MYSQL_DATABASE: bicicletasdb
+      MYSQL_HOST: bicicletasdb
+      MYSQL_PASSWORD: '1234'
+      MYSQL_ROOT_PASSWORD: '1234'
+      MYSQL_USER: diego
+    ports:
+    - 3309:3306/tcp
+  biciun:
+    image: fullhd4knofake/bicicletas
+    links:
+    - bicicletasdb:jdbc
+    ports:
+    - 3004:9002/tcp
+
+  # LOGIN
+  login-lb:
+    image: rancher/lb-service-haproxy:v0.9.1
+    ports:
+    - 4005:4005/tcp
+  1a-login-ms:
+    image: fullhd4knofake/1a_login_ms
+    ports:
+    - 3005:5000/tcp
+    links:
+    - 1a-login-db:flask-mysql
+  1a-login-db:
+    image: mysql:5.7
+    environment:
+      MYSQL_DATABASE: users
+      MYSQL_HOST: 1a-login-db
+      MYSQL_PASSWORD: '1234'
+      MYSQL_ROOT_PASSWORD: '1234'
+      MYSQL_USER: alejo
+    ports:
+    - 3310:3306/tcp
+  # FOTOS PERFIL
+  profilepictures:
+    image: fullhd4knofake/1a_profilepictures
+    environment:
+      VIRTUAL_HOST: profilepictures.local
+    links:
+    - db:mgo
+    ports:
+    - 3003:8080/tcp
+  db:
+    image: mongo:3.3
+    ports:
+    - 3008:27017/tcp
+  profilepictures-lb:
+    image: rancher/lb-service-haproxy:v0.9.1
+    ports:
+    - 4003:4003/tcp
+
+  # SECURITY
+  biciun-proxy:
+    image: fullhd4knofake/proxy:latest
+    links:
+    - biciun-api:Api-gateway
+    ports:
+    - 80:80/tcp 
+  biciun-ldap:
+    image: osixia/openldap:1.1.8
+    hostname: arqsoft.org
+    environment:
+      COMPOSE_HTTP_TIMEOUT: '200'
+      LDAP_ADMIN_PASSWORD: admin
+      LDAP_BACKEND: hdb
+      LDAP_BASE_DN: ''
+      LDAP_CONFIG_PASSWORD: config
+      LDAP_DOMAIN: arqsoft.unal.edu.co
+      LDAP_LOG_LEVEL: '256'
+      LDAP_ORGANISATION: Biciun UNAL
+      LDAP_READONLY_USER: 'false'
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: 'true'
+      LDAP_REPLICATION: 'false'
+      LDAP_SSL_HELPER_PREFIX: ldap
+      LDAP_TLS: 'true'
+      LDAP_TLS_CA_CRT_FILENAME: ca.crt
+      LDAP_TLS_CIPHER_SUITE: SECURE256:-VERS-SSL3.0
+      LDAP_TLS_CRT_FILENAME: ldap.crt
+      LDAP_TLS_ENFORCE: 'false'
+      LDAP_TLS_KEY_FILENAME: ldap.key
+      LDAP_TLS_PROTOCOL_MIN: '3.1'
+      LDAP_TLS_VERIFY_CLIENT: demand
+    stdin_open: true
+    volumes:
+    - /container/service/slapd/assets/certs/
+    - /etc/ldap/slapd.d
+    - /var/lib/ldap
+    tty: true
+    ports:
+    - 389:389/tcp
+    - 636:636/tcp
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    environment:
+      PHPLDAPADMIN_HTTPS: 'false'
+      PHPLDAPADMIN_LDAP_HOSTS: biciun-ldap
+    links:
+    - biciun-ldap:biciun-ldap
+    ports:
+    - 8085:80/tcp
+  
+  # API GATEWAY
+  biciun-api:
+    image: fullhd4knofake/api-gateway
+    environment:
+      SHOW_URLS: 'true'
+      PORT: '4500'
+      
+      BICICLETAS_ENTRY: bicicletas
+      BICICLETAS_PORT: '9002'
+      BICICLETAS_URL: bicicletas-lb
+      
+      LOGIN_ENTRY: login
+      LOGIN_PORT: '5000'
+      LOGIN_URL: 1a_login_ms
+      
+      PRESTAMOS_ENTRY: prestamos
+      PRESTAMOS_PORT: '9001'
+      PRESTAMOS_URL: historial-lb
+      
+      PROFILES_PHOTOS_ENTRY: profilepictures
+      PROFILES_PHOTOS_PORT: '8080'
+      PROFILES_PHOTOS_URL: profilepictures-lb
+      
+      AUTH_ENTRY: ldap/
+      AUTH_PORT: '4001'
+      AUTH_URL: users-lb
+
+      USERS_ENTRY: users/
+      USERS_PORT: '4001'
+      USERS_URL: users-lb
+    links:
+    - bicicletas-lb
+    - historial-lb
+    - users-lb
+    - login-lb
+    - profilepictures-lb
+    ports:
+    - 4500:4500/tcp
